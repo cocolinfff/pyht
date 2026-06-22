@@ -4,14 +4,6 @@ pyHT is a subchannel thermal-hydraulic analysis code for steady-state single-pha
 
 The code employs the Implicit Continuous-fluid Eulerian (ICE) scheme, uses CoolProp for fluid properties (IAPWS-IF97 water, Helmholtz EOS helium), and implements a C extension for performance-critical loops.
 
-## Installation
-
-```bash
-pip install git+https://github.com/placeholder/pyht.git
-```
-
-The C extension (`_solver_c`) must be compiled (see Building from Source below).
-
 ## Quick Start
 
 ```python
