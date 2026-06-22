@@ -11,7 +11,7 @@ import numpy as np
 from pyht import core
 from pyht.solver import steady_ice
 
-n_ax = 50
+n_ax = 40
 L = 1.0                           # heated length
 z = np.linspace(0, L, n_ax)
 dz = np.full(n_ax, L / n_ax)
