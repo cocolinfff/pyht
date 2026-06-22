@@ -1,8 +1,10 @@
-# pyHT — A Subchannel Thermal-Hydraulic Code
+# pyHT — A Parallel-Channel Thermal-Hydraulic Solver
 
-pyHT is a subchannel thermal-hydraulic analysis code for steady-state single-phase and two-phase (boiling) flow in nuclear reactor core parallel channels with conjugate wall heat transfer.
+pyHT is a 1D steady-state CFD solver for parallel flow channels coupled by a thermal resistance network through solid walls. It supports single-phase and two-phase (boiling) flow of water and helium.
 
 The code employs the Implicit Continuous-fluid Eulerian (ICE) scheme, uses CoolProp for fluid properties (IAPWS-IF97 water, Helmholtz EOS helium), and implements a C extension for performance-critical loops.
+
+Each channel is solved independently with a fixed mass flow rate — there is no cross-flow or lateral mass exchange between channels. Channels are thermally coupled through solid walls modeled as a 1D series resistance network (convection on both sides + conduction through the wall, i.e. `1/h_i + t_w/k_w + 1/h_j`).
 
 ## Quick Start
 
