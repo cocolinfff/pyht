@@ -147,3 +147,13 @@ class TestSaturationPhase(unittest.TestCase):
         liq = float(CP.PropsSI("L", "P", self.p, "T", self.Ts - 0.5, "Water"))
         gas = float(CP.PropsSI("L", "P", self.p, "T", self.Ts + 2.0, "Water"))
         self.assertLess(abs(got - gas), abs(got - liq))
+
+
+class TestSaturationGridConsistency(unittest.TestCase):
+    def test_tsat_grid_equals_tref_grid(self):
+        from pyht.solver.ice import _Tsat
+
+        configure_tables()
+        tab = _get_table("Water")
+        ts = np.array([_Tsat(p) for p in tab.p_grid], dtype=float)
+        np.testing.assert_allclose(ts, tab.Tref_grid, rtol=0.0, atol=1e-9)

@@ -32,18 +32,24 @@ def _h(p, T, fluid='Water'):
 
 def _h_direct(p, T):
     return _cached_CP('H', p, T, 'Water') or 400000.0
+_TCRIT = float(_CP.PropsSI('Tcrit', 'Water'))
+_PCRIT = float(_CP.PropsSI('Pcrit', 'Water'))
 _Tsat_cache = {}
 
 def _Tsat(p):
-    key = round(p, -2)
-    if key in _Tsat_cache:
-        return _Tsat_cache[key]
-    try:
-        v = float(_CP.PropsSI('T', 'P', float(p), 'Q', 0.0, 'Water'))
-        _Tsat_cache[key] = v
+    key = float(p)
+    v = _Tsat_cache.get(key)
+    if v is not None:
         return v
-    except Exception:
-        return 373.15
+    if key >= _PCRIT * 0.9999:
+        v = _TCRIT
+    else:
+        try:
+            v = float(_CP.PropsSI('T', 'P', key, 'Q', 0.0, 'Water'))
+        except Exception:
+            v = _TCRIT
+    _Tsat_cache[key] = v
+    return v
 
 def _quality(h, h_l, h_g):
     if h_l >= h_g - 1:
@@ -72,7 +78,7 @@ def _build_C_argtypes():
     lib = _C_LIB
     lib.momentum_loop_c.argtypes = [ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.c_double, ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_int), ctypes.c_double, ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.c_int, ctypes.POINTER(_AxisT), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.c_int, ctypes.POINTER(_AxisT), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double)]
     lib.momentum_loop_c.restype = None
-    lib.energy_loop_c.argtypes = [ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.c_double, ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_int), ctypes.c_double, ctypes.c_double, ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int), ctypes.c_int, ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.c_int, ctypes.POINTER(_AxisT), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.c_int, ctypes.POINTER(_AxisT), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.c_void_p, ctypes.POINTER(ctypes.c_double)]
+    lib.energy_loop_c.argtypes = [ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.c_double, ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_int), ctypes.c_double, ctypes.c_double, ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int), ctypes.c_int, ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.c_int, ctypes.POINTER(_AxisT), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.c_int, ctypes.POINTER(_AxisT), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.c_void_p, ctypes.POINTER(ctypes.c_double)]
     lib.energy_loop_c.restype = None
     lib.table_lookup_bulk.argtypes = [ctypes.POINTER(ctypes.c_double), ctypes.POINTER(_AxisT), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.c_int]
     lib.table_lookup_bulk.restype = None
@@ -240,7 +246,9 @@ def steady_ice(mesh: SubchannelMesh, T_wall: np.ndarray | None=None, max_outer: 
     rho_g_grid = np.array([_rho(p, _Tsat(p) + 0.5, fluid='Water') for p in p_grid], dtype=np.float64)
     mu_l_grid = np.array([_cached_CP('V', p, _Tsat(p) - 0.5, 'Water') for p in p_grid], dtype=np.float64)
     mu_g_grid = np.array([_cached_CP('V', p, _Tsat(p) + 0.5, 'Water') for p in p_grid], dtype=np.float64)
-    sigma_arr = np.array([float(_CP.PropsSI('I', 'P', float(p), 'Q', 0.0, 'Water')) if p < 22000000.0 else 0.001 for p in p_grid], dtype=np.float64)
+    k_l_grid = np.array([_cached_CP('L', p, _Tsat(p) - 0.5, 'Water') for p in p_grid], dtype=np.float64)
+    cp_l_grid = np.array([_cached_CP('C', p, _Tsat(p) - 0.5, 'Water') for p in p_grid], dtype=np.float64)
+    sigma_arr = np.array([float(_CP.PropsSI('I', 'P', float(p), 'Q', 0.0, 'Water')) if p < _PCRIT * 0.9999 else 0.001 for p in p_grid], dtype=np.float64)
     sv.p = p_c = np.ascontiguousarray(sv.p, dtype=np.float64)
     sv.T = T_c = np.ascontiguousarray(sv.T, dtype=np.float64)
     sv.rho = rho_c = np.ascontiguousarray(sv.rho, dtype=np.float64)
@@ -285,6 +293,8 @@ def steady_ice(mesh: SubchannelMesh, T_wall: np.ndarray | None=None, max_outer: 
     hl_c = np.ascontiguousarray(hl_grid, dtype=np.float64)
     hg_c = np.ascontiguousarray(hg_grid, dtype=np.float64)
     sigma_c = np.ascontiguousarray(sigma_arr, dtype=np.float64)
+    k_l_c = np.ascontiguousarray(k_l_grid, dtype=np.float64)
+    cp_l_c = np.ascontiguousarray(cp_l_grid, dtype=np.float64)
     tab_he = _get_table('Helium')
     mu_he_f = np.ascontiguousarray(tab_he._vals['mu'].ravel(), dtype=np.float64)
     k_he_f = np.ascontiguousarray(tab_he._vals['k'].ravel(), dtype=np.float64)
@@ -393,7 +403,7 @@ def steady_ice(mesh: SubchannelMesh, T_wall: np.ndarray | None=None, max_outer: 
             T_film_c = np.ascontiguousarray(0.5 * (sv.T + np.divide(_acc, _cnt, out=np.array(sv.T), where=_cnt > 0)), dtype=np.float64)
         else:
             T_film_c = np.ascontiguousarray(sv.T, dtype=np.float64)
-        _C_LIB.energy_loop_c(_as_ptr(p_c), _as_ptr(T_c), _as_ptr(rho_c), _as_ptr(h_c), _as_ptr(G_c), _as_ptr(alpha_c), _as_ptr(T_wall_c), _as_ptr(Dh_c), _as_ptr(areas_c), _as_ptr(P_h_c), ctypes.c_double(dz), ctypes.c_int(n_ch), ctypes.c_int(n_ax), _as_iptr(ch_tp_arr), _as_ptr(T_in_c), _as_iptr(flow_sign_arr), ctypes.c_double(urf_T), ctypes.c_double(urf_htc), _as_iptr(wall_ch_i_a), _as_iptr(wall_ch_j_a), ctypes.c_int(n_wall), _as_ptr(wall_tw_a), _as_ptr(wall_kw_a), _as_ptr(wall_Pi_a), _as_ptr(wall_Pj_a), _as_ptr(wall_Pcond_a), _as_iptr(wall_one_a), _as_iptr(fluids_arr), _as_iptr(ch_shape_arr), ch_cut_ptr, _as_ptr(mu_tab_f), _as_ptr(k_tab_f), _as_ptr(cp_tab_f), _as_ptr(rho_tab_f), _as_ptr(h_tab_f), _as_ptr(p_grid_c), ctypes.c_int(n_p), _ax_w, _as_ptr(mu_he_f), _as_ptr(k_he_f), _as_ptr(cp_he_f), _as_ptr(rho_he_f), _as_ptr(h_he_f), _as_ptr(p_grid_he_c), ctypes.c_int(n_p_he), _ax_he, _as_ptr(Tsat_c), _as_ptr(hl_c), _as_ptr(hg_c), _as_ptr(rho_l_grid), _as_ptr(rho_g_grid), _as_ptr(mu_l_grid), _as_ptr(mu_g_grid), _as_ptr(sigma_c), _as_ptr(htc_bulk_c), _as_ptr(htc_film_all_c), _as_ptr(cp_film_all_c), _as_ptr(q_net_c), _as_ptr(T_wall_ext_c) if T_wall_ext_c is not None else None, _as_ptr(T_film_c))
+        _C_LIB.energy_loop_c(_as_ptr(p_c), _as_ptr(T_c), _as_ptr(rho_c), _as_ptr(h_c), _as_ptr(G_c), _as_ptr(alpha_c), _as_ptr(T_wall_c), _as_ptr(Dh_c), _as_ptr(areas_c), _as_ptr(P_h_c), ctypes.c_double(dz), ctypes.c_int(n_ch), ctypes.c_int(n_ax), _as_iptr(ch_tp_arr), _as_ptr(T_in_c), _as_iptr(flow_sign_arr), ctypes.c_double(urf_T), ctypes.c_double(urf_htc), _as_iptr(wall_ch_i_a), _as_iptr(wall_ch_j_a), ctypes.c_int(n_wall), _as_ptr(wall_tw_a), _as_ptr(wall_kw_a), _as_ptr(wall_Pi_a), _as_ptr(wall_Pj_a), _as_ptr(wall_Pcond_a), _as_iptr(wall_one_a), _as_iptr(fluids_arr), _as_iptr(ch_shape_arr), ch_cut_ptr, _as_ptr(mu_tab_f), _as_ptr(k_tab_f), _as_ptr(cp_tab_f), _as_ptr(rho_tab_f), _as_ptr(h_tab_f), _as_ptr(p_grid_c), ctypes.c_int(n_p), _ax_w, _as_ptr(mu_he_f), _as_ptr(k_he_f), _as_ptr(cp_he_f), _as_ptr(rho_he_f), _as_ptr(h_he_f), _as_ptr(p_grid_he_c), ctypes.c_int(n_p_he), _ax_he, _as_ptr(Tsat_c), _as_ptr(hl_c), _as_ptr(hg_c), _as_ptr(rho_l_grid), _as_ptr(rho_g_grid), _as_ptr(mu_l_grid), _as_ptr(mu_g_grid), _as_ptr(k_l_c), _as_ptr(cp_l_c), _as_ptr(sigma_c), _as_ptr(htc_bulk_c), _as_ptr(htc_film_all_c), _as_ptr(cp_film_all_c), _as_ptr(q_net_c), _as_ptr(T_wall_ext_c) if T_wall_ext_c is not None else None, _as_ptr(T_film_c))
         if n_wall > 0:
             _C_LIB.update_wall_temps_c(_as_ptr(T_wall_c), _as_ptr(T_c), _as_ptr(htc_bulk_c), _as_iptr(wall_ch_i_a), _as_iptr(wall_ch_j_a), _as_ptr(wall_tw_a), _as_ptr(wall_kw_a), _as_ptr(wall_Pi_a), _as_ptr(wall_Pj_a), _as_ptr(wall_Pcond_a), ctypes.c_int(n_wall), ctypes.c_int(n_ax))
         pf['energy'] += time.perf_counter() - te

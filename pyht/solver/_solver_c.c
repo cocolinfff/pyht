@@ -779,6 +779,53 @@ static double chen_two_phase_c(double x, double G, double Dh,
 }
 
 
+static inline double friction_face(
+    int is_tp, double G_face, double h_down, double p_down,
+    double mu_down, double Dh, double dz, double rho_down,
+    const double *p_grid, int n_p,
+    const double *hl_sat_grid, const double *hg_sat_grid,
+    const double *rho_l_sat_grid, const double *rho_g_sat_grid,
+    const double *mu_l_sat_grid, const double *mu_g_sat_grid,
+    const double *sigma_tab,
+    double *a_lin_inc)
+{
+    double dp_fric;
+    if (is_tp) {
+        int i_sat; double w_sat;
+        i_sat = interp1d_idx(p_grid, n_p, p_down, &w_sat);
+        double hl = interp1d_at_w(hl_sat_grid, i_sat, w_sat);
+        double hg = interp1d_at_w(hg_sat_grid, i_sat, w_sat);
+        double x = quality_c(h_down, hl, hg);
+        double mu_liq = interp1d_at_w(mu_l_sat_grid, i_sat, w_sat);
+        double mu_re = (x > 0.0) ? mu_liq : mu_down;
+        double Re_lo = G_face * Dh / (mu_re > 1e-10 ? mu_re : 1e-10);
+        double f_lo = ff_scalar_c(Re_lo, Dh);
+        if (x > 0.0) {
+            double rho_l_ = interp1d_at_w(rho_l_sat_grid, i_sat, w_sat);
+            double rho_g_ = interp1d_at_w(rho_g_sat_grid, i_sat, w_sat);
+            double mu_g = interp1d_at_w(mu_g_sat_grid, i_sat, w_sat);
+            double sigma_j = MAX(interp1d_at_w(sigma_tab, i_sat, w_sat), 0.001);
+            double phi2 = friedel_c(x, rho_l_, rho_g_, mu_re, mu_g,
+                                    G_face, Dh, sigma_j);
+            dp_fric = f_lo * phi2 * fabs(G_face) * G_face
+                    / (2.0 * Dh * rho_down) * dz;
+        } else {
+            dp_fric = f_lo * fabs(G_face) * G_face
+                    / (2.0 * Dh * rho_down) * dz;
+        }
+        if (a_lin_inc)
+            *a_lin_inc = 32.0 * mu_re * dz / (Dh * Dh * rho_down);
+    } else {
+        double Re_j = G_face * Dh / (mu_down > 1e-10 ? mu_down : 1e-10);
+        double f = ff_scalar_c(Re_j, Dh);
+        dp_fric = f * fabs(G_face) * G_face / (2.0 * Dh * rho_down) * dz;
+        if (a_lin_inc)
+            *a_lin_inc = 32.0 * mu_down * dz / (Dh * Dh * rho_down);
+    }
+    return dp_fric;
+}
+
+
                                                                       
                                                                 
                                                                          
@@ -885,35 +932,20 @@ __declspec(dllexport) void momentum_loop_c(
                 interp2d_indices(ax, p_c[down], T_c[down], &ii, &jj, &wp, &wT);
                 double mu_down = interp2d_at(mu_tab, n_T, ii, jj, wp, wT);
 
-                double dp_fric;
-                if (is_tp) {
-                    double Re_lo = G_face * Dh_c_val / (mu_down > 1e-10 ? mu_down : 1e-10);
-                    double f_lo = ff_scalar_c(Re_lo, Dh_c_val);
-                                                                      
-                    int i_sat; double w_sat;
-                    i_sat = interp1d_idx(p_grid, n_p, p_c[down], &w_sat);
-                    double hl = interp1d_at_w(hl_sat_grid, i_sat, w_sat);
-                    double hg = interp1d_at_w(hg_sat_grid, i_sat, w_sat);
-                    double x = quality_c(h_c[down], hl, hg);
-                    if (x > 0.0) {
-                        double rho_l_ = interp1d_at_w(rho_l_sat_grid, i_sat, w_sat);
-                        double rho_g_ = interp1d_at_w(rho_g_sat_grid, i_sat, w_sat);
-                        double mu_g = interp1d_at_w(mu_g_sat_grid, i_sat, w_sat);
-                        double sigma_j = MAX(interp1d_at_w(sigma_tab, i_sat, w_sat), 0.001);
-                        double phi2 = friedel_c(x, rho_l_, rho_g_, mu_down, mu_g, G_face, Dh_c_val, sigma_j);
-                        dp_fric = f_lo * phi2 * fabs(G_c[face]) * G_face / (2.0 * Dh_c_val * rho_down) * dz;
-                    } else {
-                        dp_fric = f_lo * fabs(G_c[face]) * G_face / (2.0 * Dh_c_val * rho_down) * dz;
-                    }
-                } else {
-                    double Re_j = G_face * Dh_c_val / (mu_down > 1e-10 ? mu_down : 1e-10);
-                    double f = ff_scalar_c(Re_j, Dh_c_val);
-                    dp_fric = f * fabs(G_c[face]) * G_face / (2.0 * Dh_c_val * rho_down) * dz;
-                }
+                double a_inc = 0.0;
+                double dp_fric = friction_face(
+                    is_tp, G_face, h_c[down], p_c[down],
+                    mu_down, Dh_c_val, dz, rho_down,
+                    p_grid, n_p,
+                    hl_sat_grid, hg_sat_grid,
+                    rho_l_sat_grid, rho_g_sat_grid,
+                    mu_l_sat_grid, mu_g_sat_grid,
+                    sigma_tab,
+                    a_lin ? &a_inc : NULL);
                                                                   
                                                      
                                   
-                if (a_lin) a_lin[c] += 32.0 * mu_down * dz / (Dh_c_val * Dh_c_val * rho_down);
+                if (a_lin) a_lin[c] += a_inc;
                 if (dp_fric_acc) dp_fric_acc[c] += fabs(dp_fric);
                 double dp_grav = rho_down * 9.81 * dz;
                 double dp_acc = G_c[face] * G_c[face] *
@@ -942,32 +974,17 @@ __declspec(dllexport) void momentum_loop_c(
                 interp2d_indices(ax, p_c[down], T_c[down], &ii, &jj, &wp, &wT);
                 double mu_down = interp2d_at(mu_tab, n_T, ii, jj, wp, wT);
 
-                double dp_fric;
-                if (is_tp) {
-                    double Re_lo = G_face * Dh_c_val / (mu_down > 1e-10 ? mu_down : 1e-10);
-                    double f_lo = ff_scalar_c(Re_lo, Dh_c_val);
-                                                                      
-                    int i_sat; double w_sat;
-                    i_sat = interp1d_idx(p_grid, n_p, p_c[down], &w_sat);
-                    double hl = interp1d_at_w(hl_sat_grid, i_sat, w_sat);
-                    double hg = interp1d_at_w(hg_sat_grid, i_sat, w_sat);
-                    double x = quality_c(h_c[down], hl, hg);
-                    if (x > 0.0) {
-                        double rho_l_ = interp1d_at_w(rho_l_sat_grid, i_sat, w_sat);
-                        double rho_g_ = interp1d_at_w(rho_g_sat_grid, i_sat, w_sat);
-                        double mu_g = interp1d_at_w(mu_g_sat_grid, i_sat, w_sat);
-                        double sigma_j = MAX(interp1d_at_w(sigma_tab, i_sat, w_sat), 0.001);
-                        double phi2 = friedel_c(x, rho_l_, rho_g_, mu_down, mu_g, G_face, Dh_c_val, sigma_j);
-                        dp_fric = f_lo * phi2 * fabs(G_c[face]) * G_face / (2.0 * Dh_c_val * rho_down) * dz;
-                    } else {
-                        dp_fric = f_lo * fabs(G_c[face]) * G_face / (2.0 * Dh_c_val * rho_down) * dz;
-                    }
-                } else {
-                    double Re_j = G_face * Dh_c_val / (mu_down > 1e-10 ? mu_down : 1e-10);
-                    double f = ff_scalar_c(Re_j, Dh_c_val);
-                    dp_fric = f * fabs(G_c[face]) * G_face / (2.0 * Dh_c_val * rho_down) * dz;
-                }
-                if (a_lin) a_lin[c] += 32.0 * mu_down * dz / (Dh_c_val * Dh_c_val * rho_down);
+                double a_inc = 0.0;
+                double dp_fric = friction_face(
+                    is_tp, G_face, h_c[down], p_c[down],
+                    mu_down, Dh_c_val, dz, rho_down,
+                    p_grid, n_p,
+                    hl_sat_grid, hg_sat_grid,
+                    rho_l_sat_grid, rho_g_sat_grid,
+                    mu_l_sat_grid, mu_g_sat_grid,
+                    sigma_tab,
+                    a_lin ? &a_inc : NULL);
+                if (a_lin) a_lin[c] += a_inc;
                                                                                            
                 if (dp_fric_acc) dp_fric_acc[c] += fabs(dp_fric);
                 double dp_grav = -rho_down * 9.81 * dz;
@@ -1073,6 +1090,7 @@ __declspec(dllexport) void energy_loop_c(
     const double *hl_grid, const double *hg_grid,
     const double *rho_l_sat_grid, const double *rho_g_sat_grid,
     const double *mu_l_sat_grid, const double *mu_g_sat_grid,
+    const double *k_l_sat_grid, const double *cp_l_sat_grid,
     const double *sigma_tab,
     double *htc_bulk,
                                                                        
@@ -1164,15 +1182,34 @@ __declspec(dllexport) void energy_loop_c(
                                                                               
                                                                        
                                                              
+            double mu_j, k_j, cp;
+            int use_sat_liquid = 0;
             if (!is_he) {
-                double Tsat_j = interp1d_logp(p_grid_w, Tsat_grid, n_p_w, _ir_log, p_c[j]);
-                if (T_eff > Tsat_j && T[c * n_ax + j] <= Tsat_j + 0.5) T_eff = Tsat_j;
+                int i_sat; double w_sat;
+                i_sat = interp1d_idx(p_grid_w, n_p_w,
+                                     CLIP(p_c[j], p_grid_w[0], p_grid_w[n_p_w-1]),
+                                     &w_sat);
+                double Tsat_j = interp1d_at_w(Tsat_grid, i_sat, w_sat);
+                double hg_j = interp1d_at_w(hg_grid, i_sat, w_sat);
+                double h_bulk = h[c * n_ax + j];
+                if (h_bulk < hg_j) {
+                    if (T_eff >= Tsat_j - 0.5) {
+                        mu_j = interp1d_at_w(mu_l_sat_grid, i_sat, w_sat);
+                        k_j  = interp1d_at_w(k_l_sat_grid,  i_sat, w_sat);
+                        cp   = interp1d_at_w(cp_l_sat_grid, i_sat, w_sat);
+                        use_sat_liquid = 1;
+                    }
+                } else {
+                    if (T_eff < Tsat_j + 1.0) T_eff = Tsat_j + 1.0;
+                }
             }
-            int i, jg; double wp, wT;
-            interp2d_indices(ax, p_c[j], T_eff, &i, &jg, &wp, &wT);
-            double mu_j = interp2d_at(mu_tab, n_T, i, jg, wp, wT);
-            double k_j  = interp2d_at(k_tab,  n_T, i, jg, wp, wT);
-            double cp   = interp2d_at(cp_tab, n_T, i, jg, wp, wT);
+            if (!use_sat_liquid) {
+                int i, jg; double wp, wT;
+                interp2d_indices(ax, p_c[j], T_eff, &i, &jg, &wp, &wT);
+                mu_j = interp2d_at(mu_tab, n_T, i, jg, wp, wT);
+                k_j  = interp2d_at(k_tab,  n_T, i, jg, wp, wT);
+                cp   = interp2d_at(cp_tab, n_T, i, jg, wp, wT);
+            }
             double Re = fabs(G_c[j]) * Dh_c_val / (mu_j > 1e-10 ? mu_j : 1e-10);
             double Pr = mu_j * cp / (k_j > 1e-10 ? k_j : 1e-10);
             double Nu = nu_scalar_c(MAX(Re, 100), MAX(Pr, 0.1));
@@ -1251,13 +1288,9 @@ __declspec(dllexport) void energy_loop_c(
                 double rho_g_chen = interp1d_at_w(rho_g_sat_grid, i_sat, w_sat);
                 double mu_g_chen = interp1d_at_w(mu_g_sat_grid, i_sat, w_sat);
                                                                  
-                double T_chen = T_film[c * n_ax + j];
-                if (T_chen > Tsat_chen) T_chen = Tsat_chen;
-                int iF, jF; double wpF, wTF;
-                interp2d_indices(ax_w, p_c[j], T_chen, &iF, &jF, &wpF, &wTF);
-                double mu_l_chen = interp2d_at(mu_tab_w, ax_w->n_T, iF, jF, wpF, wTF);
-                double k_liq = interp2d_at(k_tab_w, ax_w->n_T, iF, jF, wpF, wTF);
-                double cp_liq = interp2d_at(cp_tab_w, ax_w->n_T, iF, jF, wpF, wTF);
+                double mu_l_chen = interp1d_at_w(mu_l_sat_grid, i_sat, w_sat);
+                double k_liq = interp1d_at_w(k_l_sat_grid, i_sat, w_sat);
+                double cp_liq = interp1d_at_w(cp_l_sat_grid, i_sat, w_sat);
                 double sigma_val = interp1d_at_w(sigma_tab, i_sat, w_sat);
                 double h_fg_chen = hg_chen - hl_chen;
                 double htc_chen = chen_two_phase_c(x_prev, fabs(G_c[j]), Dh[c],
