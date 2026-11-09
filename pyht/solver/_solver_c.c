@@ -751,8 +751,7 @@ static double chen_two_phase_c(double x, double G, double Dh,
                                                                                  
                                                                                
                                                                                       
-    double fz_liq = k_l * sqrt(k_l) * sqrt(sqrt(k_l)) * sqrt(cp_l) * sqrt(sqrt(sqrt(cp_l)))
-                  * rho_l * sqrt(rho_l) * sqrt(sqrt(sqrt(sqrt(rho_l))));
+    double fz_liq = pow(k_l, 0.79) * pow(cp_l, 0.45) * pow(rho_l, 0.49);
                                                                              
     double C_nb = (0.00122 * fz_liq * pow(h_fg * rho_g / MAX(Tsat_K, 1.0), 0.75)) /
         (sqrt(sigma) * pow(mu_l,0.29) * pow(h_fg,0.24) * pow(rho_g,0.24)) * S;
