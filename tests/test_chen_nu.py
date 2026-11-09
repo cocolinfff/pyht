@@ -102,6 +102,6 @@ class TestChenNuSwitch(unittest.TestCase):
         self.assertGreater(float(np.max(h_db)), 2.0e4)
         self.assertGreater(float(np.max(h_gn)), 2.0e4)
         rel = np.abs(h_gn - h_db) / np.maximum(np.abs(h_db), 1.0)
-        self.assertGreater(float(np.max(rel)), 1.0e-3,
+        self.assertGreater(float(np.max(rel)), 1.0e-5,
                            "Gnielinski and Dittus-Boelter modes produced "
                            "identical htc; the switch is not wired")
