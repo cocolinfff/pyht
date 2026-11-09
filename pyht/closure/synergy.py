@@ -23,12 +23,6 @@ def _r_of(ch):
         return 0.0
     return min(cut / a, RMAX)
 
-def _churchill(Re, eps, Dh):
-    Re = np.maximum(Re, 1e-12)
-    A = (-2.457 * np.log((7.0 / Re) ** 0.9 + 0.27 * eps / Dh)) ** 16
-    B = (37530.0 / Re) ** 16
-    return 8.0 * ((8.0 / Re) ** 12 + 1.0 / (A + B) ** 1.5) ** (1.0 / 12.0)
-
 def jk_from_state(mesh, state, n_h=4, flu='Water', k=4, fluids=None):
     n_ch, n_ax = state.T.shape
     fluid_of = np.array([getattr(ch, 'fluid', 'Water') for ch in mesh.channels])
@@ -125,20 +119,11 @@ def jk_from_state(mesh, state, n_h=4, flu='Water', k=4, fluids=None):
             ck_c = ck_he[c] if fluid_of[c] == 'Helium' else ck_w[c]
             Jch[c] = float((W[c] * ck_c * RePr[c] ** k).sum() / W[c].sum())
     _dpf = getattr(state, 'dp_fric', None)
-    f_src = 'dp_fric'
     if _dpf is None or not np.all(np.isfinite(np.asarray(_dpf))):
-        f_src = 'closure'
-        Re_c = np.abs(Gc) * Dh[:, None] / np.maximum(mu, 1e-12)
-        _eps = 1e-05
-        f_cell = np.where(Re_c < 2300.0, 56.91 / np.maximum(Re_c, 1e-12), _churchill(Re_c, _eps, Dh[:, None]))
-        f_cell = np.where(np.isfinite(f_cell) & (f_cell > 0), f_cell, np.nan)
+        f_src = 'missing'
         f_ch = np.full(n_ch, np.nan)
-        Wc = np.where(sel[:, None], W, 0.0)
-        ok = np.isfinite(f_cell)
-        num = np.where(ok, Wc * np.nan_to_num(f_cell), 0.0).sum(axis=1)
-        den = np.where(ok, Wc, 0.0).sum(axis=1)
-        f_ch = np.where(den > 0, num / np.maximum(den, 1e-300), np.nan)
     else:
+        f_src = 'dp_fric'
         _dpf = np.asarray(_dpf, dtype=float)
         rho_bar = np.mean(rho, axis=1)
         Lch = dz * state.p.shape[1]
@@ -152,7 +137,6 @@ def jk_from_state(mesh, state, n_h=4, flu='Water', k=4, fluids=None):
     f_w = float((Wsum[good] * f_ch[good]).sum() / Wsum[good].sum()) if good.any() else float('nan')
     mw = np.where(sel & np.isfinite(f_ch), mdot, 0.0)
     f_m = float((mw * np.nan_to_num(f_ch)).sum() / mw.sum()) if mw.sum() > 0 else float('nan')
-    f_cell = f_ch[:, None] * np.ones((1, state.T.shape[1]))
     sel_he = sel_by_fluid.get('Helium', np.zeros(n_ch, dtype=bool))
     W_w = np.where(sel_water[:, None], W, 0.0)
     W_w_sum = float(W_w.sum())

@@ -1599,57 +1599,6 @@ __declspec(dllexport) void energy_loop_c(
 
 
                                                                       
-                                                          
-                                                                         
-__declspec(dllexport) void htc_bulk_c(
-    double *htc_out,
-    const double *p, const double *T, const double *G,
-    const double *Dh, int n_ch, int n_ax,
-    const int *fluids,
-    const int *ch_shape,                                                            
-                                                               
-    const double *ch_cut,                                                      
-                                                                            
-    const double *mu_w, const double *k_w, const double *cp_w,
-    const double *p_grid_w, int n_p_w,
-    const axis_t *ax_w,
-    const double *mu_he, const double *k_he, const double *cp_he,
-    const double *p_grid_he, int n_p_he,
-    const axis_t *ax_he
-) {
-    PROBE_START();
-    for (int c = 0; c < n_ch; c++) {
-        int is_water = (fluids[c] == 0);
-        const double *mu_tab  = is_water ? mu_w  : mu_he;
-        const double *k_tab   = is_water ? k_w   : k_he;
-        const double *cp_tab  = is_water ? cp_w  : cp_he;
-        const axis_t *ax = is_water ? ax_w : ax_he;
-        int n_T = ax->n_T;
-        double Dh_c = Dh[c];
-
-        for (int j = 0; j < n_ax; j++) {
-            int idx = c * n_ax + j;
-            int g_idx = c * (n_ax + 1) + j;
-            int i, jg; double wp, wT;
-            interp2d_indices(ax, p[idx], T[idx], &i, &jg, &wp, &wT);
-            double mu = interp2d_at(mu_tab, n_T, i, jg, wp, wT);
-            double k  = interp2d_at(k_tab,  n_T, i, jg, wp, wT);
-            double cp = interp2d_at(cp_tab, n_T, i, jg, wp, wT);
-            double Re = fabs(G[g_idx]) * Dh_c / (mu > 1e-10 ? mu : 1e-10);
-            double Pr = mu * cp / (k > 1e-10 ? k : 1e-10);
-            double Nu = nu_scalar_c(MAX(Re, 100), MAX(Pr, 0.1));
-            htc_out[idx] = Nu * k / Dh_c * nu_rough_factor(MAX(Re, 100), Dh_c)
-                           * (ch_shape && ch_shape[c]
-                               ? duct_nu_factor(MAX(Re, 100), ch_shape[c],
-                                                ch_cut ? ch_cut[c] : 0.0)
-                               : 1.0);
-        }
-    }
-    PROBE_STOP(P_HTC);
-}
-
-
-                                                                      
                                                                                
                                                                
                                          

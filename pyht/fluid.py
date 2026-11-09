@@ -7,13 +7,6 @@ _DEFAULT_T_LIM = {
     'Helium': (273.15, 1500.0),
 }
 
-def _props(key, p, T, fluid='Water'):
-    p = np.asarray(p, dtype=float)
-    T = np.asarray(T, dtype=float)
-    scalar = p.ndim == 0 and T.ndim == 0
-    out = np.array([_CP.PropsSI(key, 'P', float(pi), 'T', float(Ti), fluid) for pi, Ti in zip(np.atleast_1d(p).flat, np.atleast_1d(T).flat)])
-    return out.item() if scalar else out.reshape(p.shape)
-
 def _props_safe(key, p, T, fluid='Water', fallback=0.0):
     try:
         return _CP.PropsSI(key, 'P', float(p), 'T', float(T), fluid)
@@ -129,25 +122,6 @@ class PropertyTable:
         save.update(self._vals)
         np.savez_compressed(cpath, **save)
 
-    def Tsat(self, p):
-        if not self.normalised:
-            return None
-        p = np.asarray(p, dtype=float)
-        scalar = p.ndim == 0
-        cache = self.__dict__.setdefault('_tsat_cache', {})
-        out = np.empty(np.atleast_1d(p).size, dtype=float)
-        for n, pv in enumerate(np.atleast_1d(p).flat):
-            key = round(float(pv), -1)
-            v = cache.get(key)
-            if v is None:
-                try:
-                    v = float(_CP.PropsSI('T', 'P', key, 'Q', 0.0, 'Water'))
-                except ValueError:
-                    v = float(_CP.PropsSI('Tcrit', 'Water'))
-                cache[key] = v
-            out[n] = v
-        return out.item() if scalar else out.reshape(p.shape)
-
     def _warn_if_out_of_range(self, p, T):
         if getattr(self, "_range_warned", False):
             return
@@ -220,26 +194,4 @@ class CoolPropWrapper:
             T_lim = _DEFAULT_T_LIM.get(fluid, (273.15, 600.0))
         _get_table(fluid).rebuild(p_range=p_lim, T_range=T_lim, n_p=n_p, n_T=n_T)
 
-    @staticmethod
-    def saturation_T(p, fluid='Water'):
-        if fluid != 'Water':
-            return None
-        p = np.asarray(p, dtype=float)
-        scalar = p.ndim == 0
-        out = []
-        for pi in np.atleast_1d(p).flat:
-            try:
-                out.append(_CP.PropsSI('T', 'P', float(pi), 'Q', 0.0, 'Water'))
-            except ValueError:
-                out.append(373.15)
-        out = np.array(out)
-        return out.item() if scalar else out.reshape(p.shape)
-
-    @staticmethod
-    def d_rho_dp(p, T, fluid='Water'):
-        return _props('d(D)/d(P)|T', p, T, fluid)
-
-    @staticmethod
-    def d_rho_dT(p, T, fluid='Water'):
-        return _props('d(D)/d(T)|P', p, T, fluid)
 WaterProperties = CoolPropWrapper

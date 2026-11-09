@@ -30,8 +30,6 @@ def _h(p, T, fluid='Water'):
     v = _cached_CP('H', p, T, fluid)
     return v if v > 0 else 400000.0
 
-def _h_direct(p, T):
-    return _cached_CP('H', p, T, 'Water') or 400000.0
 _TCRIT = float(_CP.PropsSI('Tcrit', 'Water'))
 _PCRIT = float(_CP.PropsSI('Pcrit', 'Water'))
 _Tsat_cache = {}
@@ -50,11 +48,6 @@ def _Tsat(p):
             v = _TCRIT
     _Tsat_cache[key] = v
     return v
-
-def _quality(h, h_l, h_g):
-    if h_l >= h_g - 1:
-        return 0.0
-    return float(np.clip((h - h_l) / (h_g - h_l), 0.0, 1.0))
 
 class _AxisT(ctypes.Structure):
     _fields_ = [('p_grid', ctypes.POINTER(ctypes.c_double)), ('n_p', ctypes.c_int), ('u_grid', ctypes.POINTER(ctypes.c_double)), ('n_T', ctypes.c_int), ('Tref', ctypes.POINTER(ctypes.c_double)), ('is_norm', ctypes.c_int), ('k_sat', ctypes.c_int)]
@@ -84,8 +77,6 @@ def _build_C_argtypes():
     lib.table_lookup_bulk.restype = None
     lib.update_wall_temps_c.argtypes = [ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.c_int, ctypes.c_int]
     lib.update_wall_temps_c.restype = None
-    lib.htc_bulk_c.argtypes = [ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.c_int, ctypes.POINTER(ctypes.c_double), ctypes.c_int, ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.c_int, ctypes.POINTER(ctypes.c_double), ctypes.c_int]
-    lib.htc_bulk_c.restype = None
 
 def _as_ptr(arr):
     return arr.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
@@ -189,10 +180,6 @@ def steady_ice(mesh: SubchannelMesh, T_wall: np.ndarray | None=None, max_outer: 
     wall_Pj_a = np.array([b for _, b, _ in _widths], dtype=np.float64)
     wall_Pcond_a = np.array([c for _, _, c in _widths], dtype=np.float64)
     wall_one_a = np.array([1 if getattr(w, 'one_sided', False) else 0 for w in mesh.walls], dtype=np.int32)
-    wall_idx_map = {}
-    for wi, w in enumerate(mesh.walls):
-        wall_idx_map[w.ch_i, w.ch_j] = wi
-        wall_idx_map[w.ch_j, w.ch_i] = wi
     sv = StateVector(n_ch, n_ax, n_wall)
     for c in range(n_ch):
         fl = ch_fluid[c]
