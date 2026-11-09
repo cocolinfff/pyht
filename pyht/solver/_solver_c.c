@@ -1209,7 +1209,6 @@ __declspec(dllexport) void energy_loop_c(
         const axis_t *ax = is_he ? ax_he : ax_w;
         int n_T = ax->n_T;
         double Dh_c_val = Dh[c];
-        double _ir_log = 1.0 / (log(p_grid_w[n_p_w-1]) - log(p_grid_w[0]));
 
         for (int j = 0; j < n_ax; j++) {
             double T_eff = T_film_c[j];
