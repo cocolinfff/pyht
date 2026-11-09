@@ -73,6 +73,12 @@ def _build_C_argtypes():
     lib.momentum_loop_c.restype = None
     lib.energy_loop_c.argtypes = [ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.c_double, ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_int), ctypes.c_double, ctypes.c_double, ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int), ctypes.c_int, ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.c_int, ctypes.POINTER(_AxisT), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.c_int, ctypes.POINTER(_AxisT), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.c_void_p, ctypes.POINTER(ctypes.c_double)]
     lib.energy_loop_c.restype = None
+    lib.pyht_set_chen_nu.argtypes = [ctypes.c_int]
+    lib.pyht_set_chen_nu.restype = None
+    lib.pyht_get_chen_nu.argtypes = []
+    lib.pyht_get_chen_nu.restype = ctypes.c_int
+    lib.pyht_chen_macro_c.argtypes = [ctypes.c_double] * 10
+    lib.pyht_chen_macro_c.restype = ctypes.c_double
     lib.table_lookup_bulk.argtypes = [ctypes.POINTER(ctypes.c_double), ctypes.POINTER(_AxisT), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.c_int]
     lib.table_lookup_bulk.restype = None
     lib.update_wall_temps_c.argtypes = [ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.c_int, ctypes.c_int]
@@ -83,6 +89,16 @@ def _as_ptr(arr):
 
 def _as_iptr(arr):
     return arr.ctypes.data_as(ctypes.POINTER(ctypes.c_int))
+
+def set_chen_nu(mode):
+    ivalue = int(mode)
+    if ivalue != mode or ivalue not in (0, 1):
+        raise ValueError("mode must be 0 (Dittus-Boelter) or 1 (Gnielinski)")
+    _C_LIB.pyht_set_chen_nu(ivalue)
+
+
+def get_chen_nu():
+    return int(_C_LIB.pyht_get_chen_nu())
 
 def _safe_ratio(cut, a):
     try:

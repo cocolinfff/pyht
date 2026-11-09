@@ -319,6 +319,16 @@ __declspec(dllexport) double pyht_get_roughness(void) {
     return _g_roughness_m;
 }
 
+static int _g_chen_nu_gnielinski = 1;
+
+__declspec(dllexport) void pyht_set_chen_nu(int mode) {
+    _g_chen_nu_gnielinski = (mode != 0);
+}
+
+__declspec(dllexport) int pyht_get_chen_nu(void) {
+    return _g_chen_nu_gnielinski;
+}
+
 static double ff_scalar_eps(double Re, double Dh, double roughness);
 
 static double ff_scalar_c(double Re, double Dh) {
@@ -633,6 +643,15 @@ static double nu_rough_factor(double Re, double Dh) {
     return pow(f_r / f_s, 0.68);
 }
 
+static inline double sp_htc_c(double G_abs, double Dh, double mu, double cp,
+                              double k, int shape, double cut) {
+    double Re = MAX(G_abs * Dh / (mu > 1e-10 ? mu : 1e-10), 100.0);
+    double Pr = MAX(mu * cp / (k > 1e-10 ? k : 1e-10), 0.1);
+    double Nu = nu_scalar_c(Re, Pr);
+    return Nu * k / Dh * nu_rough_factor(Re, Dh)
+         * (shape ? duct_nu_factor(Re, shape, cut) : 1.0);
+}
+
                                                                                    
 static double friedel_c(double x, double rho_l, double rho_g,
                          double mu_l, double mu_g, double G, double Dh,
@@ -722,29 +741,42 @@ static inline double void_drift_flux_c(double x, double rho_l, double rho_g,
     return alpha_raw;
 }
 
-                                                                 
+static double chen_F_c(double x, double rho_l, double rho_g,
+                       double mu_l, double mu_g) {
+    double xs = x > 0.0 ? x : 1.0e-10;
+    double X_tt = pow((1.0-xs)/xs, 0.9) * sqrt(rho_g/rho_l)
+                * pow(mu_l/MAX(mu_g,1.0e-10), 0.1);
+    double X_inv = 1.0 / MAX(X_tt, 1.0e-10);
+    double F = (X_inv <= 0.1) ? 1.0 : 2.35 * pow(X_inv + 0.213, 0.736);
+    return (F > 70.0) ? 70.0 : F;
+}
+
+static double chen_Re_l_c(double x, double G, double Dh, double mu_l) {
+    double xs = x > 0.0 ? x : 1.0e-10;
+    return G * (1.0 - xs) * Dh / MAX(mu_l, 1e-10);
+}
+
 static double chen_two_phase_c(double x, double G, double Dh,
                                 double rho_l, double rho_g,
                                 double mu_l, double mu_g,
                                 double k_l, double cp_l,
                                 double sigma, double h_fg,
-                                double dT_sat, double Tsat_K, double q_flux) {
+                                double dT_sat, double Tsat_K, double q_flux,
+                                double htc_sp_l) {
     if (x <= 0.0 || x >= 1.0) return 0.0;
-                                                                           
-                                                                            
-                        
+
+
+
     if (q_flux <= 0.0 && dT_sat <= 1.0) return 0.0;
     double Pr_l = mu_l * cp_l / MAX(k_l, 1e-10);
-    double xs = x > 0 ? x : 1e-10;
-    double X_tt = pow((1.0-xs)/xs, 0.9) * sqrt(rho_g/rho_l) * pow(mu_l/MAX(mu_g,1e-10), 0.1);
-    double X_inv = 1.0 / MAX(X_tt, 1e-10);
-                                                                              
-                                                                              
-                                                                  
-    double F = (X_inv <= 0.1) ? 1.0 : 2.35 * pow(X_inv + 0.213, 0.736);
-    if (F > 70.0) F = 70.0;
-    double Re_l = G * (1.0-xs) * Dh / MAX(mu_l, 1e-10);
-    double h_macro = 0.023 * pow(Re_l, 0.8) * pow(Pr_l, 0.4) * k_l / Dh * F;
+    double F = chen_F_c(x, rho_l, rho_g, mu_l, mu_g);
+    double Re_l = chen_Re_l_c(x, G, Dh, mu_l);
+    double h_macro;
+    if (_g_chen_nu_gnielinski && htc_sp_l > 0.0) {
+        h_macro = F * htc_sp_l;
+    } else {
+        h_macro = 0.023 * pow(Re_l, 0.8) * pow(Pr_l, 0.4) * k_l / Dh * F;
+    }
     double Re_tp = Re_l * pow(F, 1.25);
     double S = 1.0 / (1.0 + 2.53e-6 * pow(Re_tp, 1.17));
                                                                         
@@ -775,6 +807,19 @@ static double chen_two_phase_c(double x, double G, double Dh,
                 / pow(h_fg * rho_g / MAX(Tsat_K, 1.0), 0.75);
     }
     return h_macro + (h_micro > 0 ? h_micro : 0);
+}
+
+__declspec(dllexport) double pyht_chen_macro_c(
+    double x, double G, double Dh, double rho_l, double rho_g,
+    double mu_l, double mu_g, double k_l, double cp_l, double htc_sp_l)
+{
+    if (x <= 0.0 || x >= 1.0) return 0.0;
+    double Pr_l = mu_l * cp_l / MAX(k_l, 1.0e-10);
+    double F = chen_F_c(x, rho_l, rho_g, mu_l, mu_g);
+    double Re_l = chen_Re_l_c(x, G, Dh, mu_l);
+    return (_g_chen_nu_gnielinski && htc_sp_l > 0.0)
+        ? F * htc_sp_l
+        : 0.023 * pow(Re_l, 0.8) * pow(Pr_l, 0.4) * k_l / Dh * F;
 }
 
 
@@ -1142,14 +1187,9 @@ __declspec(dllexport) void energy_loop_c(
             double mu = interp2d_at(mu_tab, n_Tv, i, jg, wp, wT);
             double k  = interp2d_at(k_tab,  n_Tv, i, jg, wp, wT);
             double cp = interp2d_at(cp_tab, n_Tv, i, jg, wp, wT);
-            double Re = fabs(G[gj]) * Dh_c / (mu > 1e-10 ? mu : 1e-10);
-            double Pr = mu * cp / (k > 1e-10 ? k : 1e-10);
-            double Nu = nu_scalar_c(MAX(Re, 100), MAX(Pr, 0.1));
-            htc_bulk[idx] = Nu * k / Dh_c * nu_rough_factor(MAX(Re, 100), Dh_c)
-                            * (ch_shape && ch_shape[c]
-                               ? duct_nu_factor(MAX(Re, 100), ch_shape[c],
-                                                ch_cut ? ch_cut[c] : 0.0)
-                               : 1.0);
+            htc_bulk[idx] = sp_htc_c(fabs(G[gj]), Dh_c, mu, cp, k,
+                                     ch_shape ? ch_shape[c] : 0,
+                                     ch_cut ? ch_cut[c] : 0.0);
         }
     }
     PROBE_STOP(P_HTC);
@@ -1209,14 +1249,9 @@ __declspec(dllexport) void energy_loop_c(
                 k_j  = interp2d_at(k_tab,  n_T, i, jg, wp, wT);
                 cp   = interp2d_at(cp_tab, n_T, i, jg, wp, wT);
             }
-            double Re = fabs(G_c[j]) * Dh_c_val / (mu_j > 1e-10 ? mu_j : 1e-10);
-            double Pr = mu_j * cp / (k_j > 1e-10 ? k_j : 1e-10);
-            double Nu = nu_scalar_c(MAX(Re, 100), MAX(Pr, 0.1));
-            double htc_sp = Nu * k_j / Dh_c_val * nu_rough_factor(MAX(Re, 100), Dh_c_val)
-                            * (ch_shape && ch_shape[c]
-                               ? duct_nu_factor(MAX(Re, 100), ch_shape[c],
-                                                ch_cut ? ch_cut[c] : 0.0)
-                               : 1.0);
+            double htc_sp = sp_htc_c(fabs(G_c[j]), Dh_c_val, mu_j, cp, k_j,
+                                     ch_shape ? ch_shape[c] : 0,
+                                     ch_cut ? ch_cut[c] : 0.0);
             htc_sp_all[j] = htc_sp;
                                                                              
                                                                              
@@ -1292,12 +1327,20 @@ __declspec(dllexport) void energy_loop_c(
                 double cp_liq = interp1d_at_w(cp_l_sat_grid, i_sat, w_sat);
                 double sigma_val = interp1d_at_w(sigma_tab, i_sat, w_sat);
                 double h_fg_chen = hg_chen - hl_chen;
+                double htc_sp_l = htc_sp_all[j];
+                if (_g_chen_nu_gnielinski) {
+                    htc_sp_l = sp_htc_c(fabs(G_c[j]) * (1.0 - x_prev), Dh[c],
+                                        mu_l_chen, cp_liq, k_liq,
+                                        ch_shape ? ch_shape[c] : 0,
+                                        ch_cut ? ch_cut[c] : 0.0);
+                }
                 double htc_chen = chen_two_phase_c(x_prev, fabs(G_c[j]), Dh[c],
                                                    rho_l_chen, rho_g_chen,
                                                    mu_l_chen, mu_g_chen,
                                                    k_liq, cp_liq,
                                                    sigma_val, h_fg_chen,
-                                                   dT_sat, Tsat_chen, q_flux);
+                                                   dT_sat, Tsat_chen, q_flux,
+                                                   htc_sp_l);
                 if (htc_chen > htc) htc = htc_chen;
             }
                                                                                 
