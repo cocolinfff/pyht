@@ -250,17 +250,19 @@ static inline void interp2d_indices(
     if (ax->is_norm) {
         double Tref = ax->Tref[*i] + (*wp) * (ax->Tref[*i+1] - ax->Tref[*i]);
         double u = CLIP(T / Tref, ug[0], ug[n_T-1]);
-                                                                                
-        int lo = 0, hi = n_T - 1;
-        while (lo + 1 < hi) {
-            int mid = (lo + hi) >> 1;
-            if (ug[mid] <= u) lo = mid; else hi = mid;
+        if (ax->k_sat >= 0 && u > 1.0 - 1.0e-9 && u <= 1.0 + 1.0e-3) {
+            *j = ax->k_sat - 1;
+            *wT = 1.0;
+        } else {
+            int lo = 0, hi = n_T - 1;
+            while (lo + 1 < hi) {
+                int mid = (lo + hi) >> 1;
+                if (ug[mid] <= u) lo = mid; else hi = mid;
+            }
+            *j = CLIP(lo, 0, n_T - 2);
+            double dT = ug[*j+1] - ug[*j];
+            *wT = (dT > 0.0) ? (u - ug[*j]) / dT : 0.0;
         }
-        *j = lo;
-        if (ax->k_sat >= 0 && *j == ax->k_sat) *j = ax->k_sat - 1;                   
-        *j = CLIP(*j, 0, n_T - 2);
-        double dT = ug[*j+1] - ug[*j];
-        *wT = (dT > 0.0) ? (u - ug[*j]) / dT : 0.0;
     } else {
         double u = CLIP(T, ug[0], ug[n_T-1]);
         double ir_T = 1.0 / (ug[n_T-1] - ug[0]);
@@ -282,6 +284,14 @@ static inline double interp2d(const double *tab, const axis_t *ax,
     int i, j; double wp, wT;
     interp2d_indices(ax, p, T, &i, &j, &wp, &wT);
     return interp2d_at(tab, ax->n_T, i, j, wp, wT);
+}
+
+__declspec(dllexport) void table_lookup_bulk(
+    const double *tab, const axis_t *ax,
+    const double *p, const double *T, double *out, int n)
+{
+    for (int k = 0; k < n; k++)
+        out[k] = interp2d(tab, ax, p[k], T[k]);
 }
 
                                                                                                    

@@ -148,33 +148,33 @@ class PropertyTable:
             out[n] = v
         return out.item() if scalar else out.reshape(p.shape)
 
+    def _warn_if_out_of_range(self, p, T):
+        if getattr(self, "_range_warned", False):
+            return
+        lo_p, hi_p = float(self.p_grid[0]), float(self.p_grid[-1])
+        lo_T, hi_T = self.T_lim
+        if (np.any(p < lo_p) or np.any(p > hi_p)
+                or np.any(T < lo_T) or np.any(T > hi_T)):
+            import warnings
+            warnings.warn(
+                "%s property table queried outside p=[%.6g, %.6g] Pa, "
+                "T=[%.6g, %.6g] K; values are CLAMPED. "
+                "Call CoolPropWrapper.set_table_range()."
+                % (self.fluid, lo_p, hi_p, lo_T, hi_T),
+                RuntimeWarning, stacklevel=3)
+            self._range_warned = True
+
     def __call__(self, name, p, T):
-        vals = self._vals[name]
-        n_p, n_T = vals.shape
+        from .solver.ice import _table_lookup_bulk
+
         p = np.asarray(p, dtype=float)
         T = np.asarray(T, dtype=float)
         scalar = p.ndim == 0 and T.ndim == 0
-        log_p0 = np.log(self.p_grid[0])
-        log_p1 = np.log(self.p_grid[-1])
-        ratio = (np.log(np.maximum(p, self.p_grid[0])) - log_p0) / (log_p1 - log_p0)
-        i = np.clip(np.floor(ratio * (n_p - 1)).astype(int), 0, n_p - 2)
-        wp = (p - self.p_grid[i]) / (self.p_grid[i + 1] - self.p_grid[i])
-        if self.normalised:
-            Tref = (1 - wp) * self.Tref_grid[i] + wp * self.Tref_grid[i + 1]
-            u = T / Tref
-            j = np.searchsorted(self.u_grid, u, side='right') - 1
-            j = np.clip(j, 0, n_T - 2)
-            j = np.where(j == self.k_sat, self.k_sat - 1, j)
-            j = np.clip(j, 0, n_T - 2)
-            wT = (u - self.u_grid[j]) / (self.u_grid[j + 1] - self.u_grid[j])
-            wT = np.clip(wT, 0.0, 1.0)
-        else:
-            u = T
-            ratio_T = (np.maximum(u, self.u_grid[0]) - self.u_grid[0]) / (self.u_grid[-1] - self.u_grid[0])
-            j = np.clip(np.floor(ratio_T * (n_T - 1)).astype(int), 0, n_T - 2)
-            wT = (u - self.u_grid[j]) / (self.u_grid[j + 1] - self.u_grid[j])
-        result = (1 - wp) * (1 - wT) * vals[i, j] + wp * (1 - wT) * vals[i + 1, j] + (1 - wp) * wT * vals[i, j + 1] + wp * wT * vals[i + 1, j + 1]
-        return float(result) if scalar else result
+        pb, Tb = np.broadcast_arrays(p, T)
+        shape = pb.shape
+        self._warn_if_out_of_range(np.atleast_1d(pb), np.atleast_1d(Tb))
+        out = _table_lookup_bulk(self, name, pb, Tb)
+        return float(out[0]) if scalar else out.reshape(shape)
 _tables: dict[str, PropertyTable] = {}
 
 def _get_table(fluid='Water'):
