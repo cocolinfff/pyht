@@ -2,6 +2,11 @@ import os, hashlib, json, numpy as np
 import CoolProp.CoolProp as _CP
 _KEYS = {'rho': 'D', 'mu': 'V', 'k': 'L', 'cp': 'C', 'h': 'H', 's': 'S'}
 
+_DEFAULT_T_LIM = {
+    'Water': (273.15, 600.0),
+    'Helium': (273.15, 1500.0),
+}
+
 def _props(key, p, T, fluid='Water'):
     p = np.asarray(p, dtype=float)
     T = np.asarray(T, dtype=float)
@@ -38,10 +43,11 @@ def _props_Np1(key, p, T, fluid='Water', fallback=0.0):
 class PropertyTable:
     normalised = False
 
-    def __init__(self, fluid='Water', p_lim=(10000.0, 20000000.0), T_lim=(273.15, 600.0), n_p=50, n_T=50):
+    def __init__(self, fluid='Water', p_lim=(10000.0, 20000000.0), T_lim=None, n_p=50, n_T=50):
         self.fluid = fluid
         self.p_lim = tuple(p_lim)
-        self.T_lim = tuple(T_lim)
+        self.T_lim = tuple(_DEFAULT_T_LIM.get(fluid, (273.15, 600.0))
+                           if T_lim is None else T_lim)
         self._built = False
         self._build(n_p, n_T)
 
@@ -60,6 +66,8 @@ class PropertyTable:
         return os.path.join(d, f'{h}.npz')
 
     def _build(self, n_p, n_T):
+        self.__dict__.pop('_axis_keep', None)
+        self.__dict__.pop('_range_warned', None)
         cpath = self._cache_path(n_p, n_T)
         if os.path.isfile(cpath):
             data = np.load(cpath)
@@ -207,7 +215,9 @@ class CoolPropWrapper:
         return val
 
     @classmethod
-    def set_table_range(cls, p_lim=(10000.0, 20000000.0), T_lim=(273.15, 600.0), n_p=50, n_T=50, fluid='Water'):
+    def set_table_range(cls, p_lim=(10000.0, 20000000.0), T_lim=None, n_p=50, n_T=50, fluid='Water'):
+        if T_lim is None:
+            T_lim = _DEFAULT_T_LIM.get(fluid, (273.15, 600.0))
         _get_table(fluid).rebuild(p_range=p_lim, T_range=T_lim, n_p=n_p, n_T=n_T)
 
     @staticmethod

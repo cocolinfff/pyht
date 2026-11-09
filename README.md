@@ -42,7 +42,7 @@ mesh.add_channel(Channel(
     0, 1e-4, 0.01, 0.04,
     np.linspace(0.0, L, n_ax + 1),
     np.linspace(L / n_ax / 2, L - L / n_ax / 2, n_ax),
-    L / n_ax, 0.1, 300.0, 15.5e6, np.zeros(n_ax),
+    L / n_ax, 0.1, 300.0, 15.5e6,
     fluid="Water", flow_sign=1,
 ))
 state, history = steady_ice(mesh, max_outer=200, tol=1e-6)
