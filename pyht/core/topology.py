@@ -1,51 +1,49 @@
-"""
-Subchannel topology: channel geometry and wall adjacency graph.
-"""
-
 import numpy as np
 from dataclasses import dataclass, field
-
 
 @dataclass
 class Channel:
     id: int
-    area: float           # flow area [m²]
-    Dh: float             # hydraulic diameter [m]
-    P_heated: float       # heated perimeter (external heating) [m]
-
-    # axial mesh
-    x: np.ndarray = field(repr=False)        # node positions [m]
-    z: np.ndarray = field(repr=False)        # cell centers [m]
+    area: float
+    Dh: float
+    P_heated: float
+    x: np.ndarray = field(repr=False)
+    z: np.ndarray = field(repr=False)
     dz: float = field(repr=False, default=0.0)
-
-    # boundary conditions
     m_dot_in: float = 0.0
     T_in: float = 0.0
     p_out: float = 0.0
-
     q_wall: np.ndarray = field(repr=False, default=None)
-    fluid: str = "Water"  # CoolProp fluid (Water, Helium, ...)
-
-    # extended properties for momentum/energy
-    flow_sign: int = 1      # flow direction: +1 upward, -1 downward
-    K_in: float = 0.5       # inlet form loss coefficient
-    K_out: float = 1.0      # outlet form loss coefficient
-    heated_sign: int = 1    # heating direction: +1 wall→fluid
+    fluid: str = 'Water'
+    shape: str = 'circle'
+    cut: float = 0.0
+    a: float = 0.0
+    flow_sign: int = 1
+    K_in: float = 0.0
+    K_out: float = 0.0
+    heated_sign: int = 1
 
     def num_cells(self) -> int:
         return len(self.z)
 
-
 @dataclass
 class Wall:
-    """Solid wall connecting two channels (thermal coupling, no mass exchange)."""
     id: int
-    ch_i: int             # first channel index
-    ch_j: int             # second channel index
-    t_w: float            # wall thickness [m]
-    P_w: float            # wall heat transfer width [m] (contact width)
-    k_w: float = 15.0     # wall thermal conductivity [W/m·K] (SS304 default)
+    ch_i: int
+    ch_j: int
+    t_w: float
+    P_w: float
+    k_w: float = 15.0
+    one_sided: bool = False
+    P_i: float | None = None
+    P_j: float | None = None
+    P_cond: float | None = None
 
+    def widths(self) -> tuple[float, float, float]:
+        pi = self.P_w if self.P_i is None else self.P_i
+        pj = self.P_w if self.P_j is None else self.P_j
+        pc = self.P_w if self.P_cond is None else self.P_cond
+        return (float(pi), float(pj), float(pc))
 
 @dataclass
 class SubchannelMesh:
@@ -68,6 +66,3 @@ class SubchannelMesh:
 
     def ch_idx(self, ch_id: int) -> int:
         return self._ch_map[ch_id]
-
-
-
