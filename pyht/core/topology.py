@@ -13,7 +13,6 @@ class Channel:
     m_dot_in: float = 0.0
     T_in: float = 0.0
     p_out: float = 0.0
-    q_wall: np.ndarray = field(repr=False, default=None)
     fluid: str = 'Water'
     shape: str = 'circle'
     cut: float = 0.0
@@ -21,7 +20,6 @@ class Channel:
     flow_sign: int = 1
     K_in: float = 0.0
     K_out: float = 0.0
-    heated_sign: int = 1
 
     def num_cells(self) -> int:
         return len(self.z)
