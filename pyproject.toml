@@ -1,38 +1,20 @@
 [build-system]
-requires = ["setuptools>=64.0", "wheel"]
+requires = ["setuptools>=64"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyht"
-version = "0.1.0"
-description = "High-Performance Subchannel Thermal-Hydraulic Code for nuclear reactor core analysis"
-readme = "README.md"
-license = { text = "GPL-3.0" }
-requires-python = ">=3.9"
-
+version = "0.4.0"
+description = "High-Performance Subchannel Thermal-Hydraulic Code"
+requires-python = ">=3.10"
 dependencies = [
-    "numpy>=1.21.0",
-    "scipy>=1.7.0",
-    "CoolProp>=6.4.1",
+    "numpy>=1.21",
+    "scipy>=1.7",
+    "CoolProp>=6.4",
 ]
-
-classifiers = [
-    "Development Status :: 3 - Alpha",
-    "Intended Audience :: Science/Research",
-    "Topic :: Scientific/Engineering",
-    "Topic :: Scientific/Engineering :: Physics",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: C",
-    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
-    "Operating System :: Microsoft :: Windows",
-    "Operating System :: POSIX :: Linux",
-    "Operating System :: MacOS",
-]
-
-[project.urls]
-Homepage = "https://github.com/placeholder/pyht"
-Repository = "https://github.com/placeholder/pyht.git"
-Documentation = "https://github.com/placeholder/pyht"
+[project.optional-dependencies]
+opt = ["pymoo>=0.6"]
+plot = ["matplotlib>=3.5"]
 
 [tool.setuptools.packages.find]
 include = ["pyht*"]
