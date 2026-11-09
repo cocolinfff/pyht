@@ -148,13 +148,24 @@ def steady_ice(mesh: SubchannelMesh, T_wall: np.ndarray | None=None, max_outer: 
     dz = mesh.channels[0].dz
     n_wall = len(mesh.walls)
     has_ht = T_wall is not None or n_wall > 0
+    try:
+        wall_ci = np.array([mesh.ch_idx(w.ch_i) for w in mesh.walls],
+                           dtype=np.int32)
+        wall_cj = np.array([mesh.ch_idx(w.ch_j) for w in mesh.walls],
+                           dtype=np.int32)
+    except KeyError as exc:
+        raise ValueError(
+            'Wall references unknown Channel.id %r. Wall.ch_i/ch_j must be '
+            'Channel.id values, and add_channel() must be called before '
+            'add_wall().' % (exc.args[0],)) from None
     ch_fluid = [getattr(ch, 'fluid', 'Water') for ch in mesh.channels]
     ch_tp = [two_phase and f == 'Water' for f in ch_fluid]
     wall_adj = [[] for _ in range(n_ch)]
     for wi, w in enumerate(mesh.walls):
         _pi, _pj, _ = w.widths()
-        wall_adj[w.ch_i].append((wi, w.ch_j, w.t_w, w.k_w, _pi))
-        wall_adj[w.ch_j].append((wi, w.ch_i, w.t_w, w.k_w, _pj))
+        ci, cj = int(wall_ci[wi]), int(wall_cj[wi])
+        wall_adj[ci].append((wi, cj, w.t_w, w.k_w, _pi))
+        wall_adj[cj].append((wi, ci, w.t_w, w.k_w, _pj))
     wall_offsets = [0]
     wall_other_l, wall_wi_l, wall_tw_l, wall_kw_l, wall_Pw_l = ([], [], [], [], [])
     for c in range(n_ch):
@@ -171,8 +182,8 @@ def steady_ice(mesh: SubchannelMesh, T_wall: np.ndarray | None=None, max_outer: 
     wall_kw_a = np.array(wall_kw_l, dtype=np.float64)
     wall_Pw_a = np.array(wall_Pw_l, dtype=np.float64)
     wall_offsets_a = np.array(wall_offsets, dtype=np.int32)
-    wall_ch_i_a = np.array([w.ch_i for w in mesh.walls], dtype=np.int32)
-    wall_ch_j_a = np.array([w.ch_j for w in mesh.walls], dtype=np.int32)
+    wall_ch_i_a = wall_ci
+    wall_ch_j_a = wall_cj
     _widths = [w.widths() for w in mesh.walls]
     wall_Pi_a = np.array([a for a, _, _ in _widths], dtype=np.float64)
     wall_Pj_a = np.array([b for _, b, _ in _widths], dtype=np.float64)
@@ -222,7 +233,7 @@ def steady_ice(mesh: SubchannelMesh, T_wall: np.ndarray | None=None, max_outer: 
             pass
     if n_wall > 0 and (not _ws_ok):
         for wi, w in enumerate(mesh.walls):
-            T0 = 0.5 * (sv.T[w.ch_i, 0] + sv.T[w.ch_j, 0])
+            T0 = 0.5 * (sv.T[int(wall_ci[wi]), 0] + sv.T[int(wall_cj[wi]), 0])
             sv.T_wall[wi, 0, :] = T0
             sv.T_wall[wi, 1, :] = T0
     if not _ws_ok:
