@@ -103,6 +103,16 @@ def _safe_ratio(cut, a):
         return 0.0
     return min(1.0, c / a)
 
+def _check_table_range(tab, p_lo, p_hi, T_lo, T_hi):
+    if (p_lo < tab.p_grid[0] or p_hi > tab.p_grid[-1]
+            or T_lo < tab.T_lim[0] or T_hi > tab.T_lim[1]):
+        raise ValueError(
+            "%s property table p=[%.6g, %.6g] Pa, T=[%.6g, %.6g] K does not "
+            "cover this solve (p_out=[%.6g, %.6g] Pa, T=[%.6g, %.6g] K). "
+            "Call CoolPropWrapper.set_table_range(...) before steady_ice()."
+            % (tab.fluid, tab.p_grid[0], tab.p_grid[-1],
+               tab.T_lim[0], tab.T_lim[1], p_lo, p_hi, T_lo, T_hi))
+
 def _table_lookup_bulk(tab, name, p, T):
     vals = np.ascontiguousarray(tab._vals[name].ravel(), dtype=np.float64)
     p = np.ascontiguousarray(np.asarray(p, dtype=np.float64).ravel())
@@ -306,6 +316,22 @@ def steady_ice(mesh: SubchannelMesh, T_wall: np.ndarray | None=None, max_outer: 
     n_p_he = len(tab_he.p_grid)
     n_T_he = len(tab_he.T_grid)
     _ax_he = ctypes.byref(_axis_of(tab_he)[0])
+    for _code, _tab in ((0, tab_w), (1, tab_he)):
+        _sel = fluids_arr == _code
+        if not np.any(_sel):
+            continue
+        _p = p_out_c[_sel]
+        _ti = T_in_c[_sel]
+        _t_lo = float(np.min(_ti))
+        _t_hi = float(np.max(_ti))
+        if T_wall is not None:
+            _tw = np.asarray(T_wall, dtype=np.float64)
+            if _tw.size and _tw.shape[0] == n_ch:
+                _tw = _tw[_sel]
+                _t_lo = min(_t_lo, float(np.min(_tw)))
+                _t_hi = max(_t_hi, float(np.max(_tw)))
+        _check_table_range(_tab, float(np.min(_p)), float(np.max(_p)),
+                           _t_lo, _t_hi)
     T_wall_ext_c = np.ascontiguousarray(T_wall, dtype=np.float64) if T_wall is not None else None
     htc_film_all_c = np.zeros((n_ch, n_ax), dtype=np.float64)
     cp_film_all_c = np.zeros((n_ch, n_ax), dtype=np.float64)

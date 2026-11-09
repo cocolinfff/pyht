@@ -157,3 +157,69 @@ class TestSaturationGridConsistency(unittest.TestCase):
         tab = _get_table("Water")
         ts = np.array([_Tsat(p) for p in tab.p_grid], dtype=float)
         np.testing.assert_allclose(ts, tab.Tref_grid, rtol=0.0, atol=1e-9)
+
+
+from pyht.core.topology import Channel, SubchannelMesh
+from pyht.solver.ice import steady_ice
+
+
+class TestTableRangeValidation(unittest.TestCase):
+    def test_out_of_range_inlet_raises(self):
+        from pyht.fluid import CoolPropWrapper
+        try:
+            CoolPropWrapper.set_table_range(p_lim=(5e5, 1e7),
+                                            T_lim=(300.0, 600.0),
+                                            n_p=20, n_T=40, fluid="Helium")
+            n_ax, L = 3, 0.3
+            dz = L / n_ax
+            m = SubchannelMesh()
+            m.add_channel(Channel(
+                id=0, area=1e-4, Dh=1e-2, P_heated=0.0,
+                x=np.linspace(0.0, L, n_ax + 1),
+                z=np.linspace(dz / 2, L - dz / 2, n_ax), dz=dz,
+                m_dot_in=0.01, T_in=973.15, p_out=3e6,
+                fluid="Helium", flow_sign=1))
+            with self.assertRaises(ValueError) as ctx:
+                steady_ice(m, max_outer=1, tol=1e-3, verbose=False)
+            self.assertIn("set_table_range", str(ctx.exception))
+        finally:
+            configure_tables()
+
+
+class TestTableRangePerFluid(unittest.TestCase):
+    def _mesh(self, fluids):
+        n_ax, L = 3, 0.3
+        dz = L / n_ax
+        m = SubchannelMesh()
+        for cid, (fluid, tin) in enumerate(fluids):
+            m.add_channel(Channel(
+                id=cid, area=1e-4, Dh=1e-2, P_heated=0.0,
+                x=np.linspace(0.0, L, n_ax + 1),
+                z=np.linspace(dz / 2, L - dz / 2, n_ax), dz=dz,
+                m_dot_in=0.01, T_in=tin, p_out=5.0e5,
+                fluid=fluid, flow_sign=1))
+        return m
+
+    def test_mixed_mesh_checks_each_fluid_against_its_own_table(self):
+        from pyht.fluid import CoolPropWrapper
+        try:
+            CoolPropWrapper.set_table_range((5e4, 1e6), (273.15, 600.0),
+                                            30, 80, "Water")
+            CoolPropWrapper.set_table_range((5e5, 1e7), (300.0, 1173.15),
+                                            30, 80, "Helium")
+            m = self._mesh((("Water", 503.15), ("Helium", 973.15)))
+            steady_ice(m, max_outer=1, tol=1e-3, verbose=False)
+        finally:
+            configure_tables()
+
+    def test_absent_fluid_table_is_not_required(self):
+        from pyht.fluid import CoolPropWrapper
+        try:
+            CoolPropWrapper.set_table_range((5e4, 1e6), (273.15, 600.0),
+                                            30, 80, "Water")
+            CoolPropWrapper.set_table_range((5e5, 1e7), (300.0, 400.0),
+                                            30, 80, "Helium")
+            m = self._mesh((("Water", 300.0),))
+            steady_ice(m, max_outer=1, tol=1e-3, verbose=False)
+        finally:
+            configure_tables()
