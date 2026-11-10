@@ -1308,8 +1308,9 @@ __declspec(dllexport) void energy_loop_c(
                                                                                 
                                                                     
             double q_flux = 0.0;
-            if (Pw_tot && Pw_tot[c] > 0.0)
-                q_flux = fabs(q_net[c * n_ax + j]) / (Pw_tot[c] * dz);
+            double P_flux = (Pw_tot && Pw_tot[c] > 0.0) ? Pw_tot[c] : P_h[c];
+            if (P_flux > 0.0)
+                q_flux = fabs(q_net[c * n_ax + j]) / P_flux;
             if (hl_chen >= hg_chen - 1.0) {
                                                             
             } else if (x_prev <= 0.001 && dT_sat > 5.0) {

@@ -50,5 +50,5 @@ class TestTwoPhaseHtc(unittest.TestCase):
         hmax = float(np.max(state.htc_film[w]))
         self.assertGreater(hmax, 2.0e4)
         self.assertLess(
-            hmax, 1.0e6,
-            "Chen nucleate term is ~61x too large; check fz_liq exponents")
+            hmax, 1.0e5,
+            "htc too large: check fz_liq exponents and q_flux units")
