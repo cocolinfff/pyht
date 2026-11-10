@@ -50,6 +50,8 @@ class SubchannelMesh:
     _ch_map: dict = field(default_factory=dict)
 
     def add_channel(self, ch: Channel):
+        if ch.id in self._ch_map:
+            raise ValueError(f"duplicate Channel.id {ch.id}")
         self._ch_map[ch.id] = len(self.channels)
         self.channels.append(ch)
 
